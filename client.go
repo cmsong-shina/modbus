@@ -56,6 +56,8 @@ type ClientConfiguration struct {
 	// Logger provides a custom sink for log messages.
 	// If nil, messages will be written to stdout.
 	Logger        *log.Logger
+	// Reuse existing socket
+	Socket        net.Conn
 }
 
 // Modbus client object.
@@ -299,11 +301,18 @@ func (mc *ModbusClient) Open() (err error) {
 			newTLSSockWrapper(sock), mc.conf.Timeout, mc.conf.Logger)
 
 	case modbusTCPOverUDP:
-		// open a socket to the remote host (note: no actual connection is
-		// being made as UDP is connection-less)
-		sock, err = net.DialTimeout("udp", mc.conf.URL, 5 * time.Second)
-		if err != nil {
-			return
+		var sock net.Conn
+
+		if mc.conf.Socket == nil {
+			// open a socket to the remote host (note: no actual connection is
+			// being made as UDP is connection-less)
+			sock, err = net.DialTimeout("udp", mc.conf.URL, 5 * time.Second)
+			if err != nil {
+				return
+			}
+		} else {
+			// reuse exsiting socket
+			sock = mc.conf.Socket
 		}
 
 		// create the TCP transport, wrapping the UDP socket in
